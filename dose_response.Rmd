@@ -1,0 +1,102 @@
+---
+title: "Dose x Response essay"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+---
+
+# Load dependencies
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+
+library(dplyr)
+
+```
+
+
+# Load CSV file
+```{r}
+
+(data <- read.csv("09_06_20.csv", sep = ";"))
+data$Log10_Dose = log10(data$Dose)
+(data.1 <- subset(data, Dose != 0))
+
+```
+
+
+# Summarize data
+```{r}
+
+(summarize_data <- data.1 %>%
+  group_by(Isolado, Dose) %>%
+  summarise(
+    mean = mean(Inibicao_perc),
+    sd = sd(Inibicao_perc),
+    var = var(Inibicao_perc),
+    min = min(Inibicao_perc),
+    max = max(Inibicao_perc),
+    n = n()
+  ))
+
+```
+
+
+# Export summarize file
+```{r}
+
+write.csv(summarize_data, "summarize_data.csv")
+
+```
+
+
+# Run linear regression
+```{r}
+
+isolates <- factor(unique(data.1$Isolado))
+output <- data.frame(matrix(ncol = 5, nrow = length(isolates)))
+colnames(output) <- c("Isolate", "Intercept", "Coefficient", "Log 10 50% inhibition dose (ppm)", "Antilog")
+
+for (isolate in seq_along(isolates)) {
+  
+  # Subsample full dataset
+  isolate_sample <- subset(data.1, Isolado == isolates[isolate])
+  
+  # Generate linear regression and extract the coefficients
+  isolate_coef <- coef(lm(Inibicao_perc ~ Log10_Dose, data = isolate_sample))
+  
+  # Store values in intercept and coefficient variables
+  intercept = isolate_coef[[1]]
+  coefficient = isolate_coef[[2]]
+  inhibition_50 = (50 - intercept) / coefficient
+  
+  # Fill output data.frame with:
+  
+  ## Isolate
+  output[isolate,1] = isolate
+  
+  ## Intercept
+  output[isolate,2] = intercept
+  
+  ## Regression coefficient
+  output[isolate,3] = coefficient
+  
+  ## Log10 inhibition
+  output[isolate,4] = inhibition_50
+  
+  ## Antilog
+  output[isolate,5] = 10^inhibition_50
+}
+
+output
+
+```
+
+
+# Export results
+```{r}
+
+write.csv(output, "output.csv")
+
+```
+
